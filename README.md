@@ -1,6 +1,9 @@
 # Stardew Mod Manager
 
 一个使用 SwiftUI 制作的 macOS 星露谷物语模组管理器雏形。当前版本专注于本地扫描 SMAPI 模组目录，并展示 `manifest.json` 中的基础信息。
+---
+<img width="2308" height="1692" alt="CleanShot 2026-06-09 at 19 21 46@2x" src="https://github.com/user-attachments/assets/7bab5d3e-b179-4132-97c5-9b3c563b64e3" />
+
 
 ## 当前功能
 
