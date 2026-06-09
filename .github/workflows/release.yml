@@ -1,0 +1,29 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test
+        run: swift test
+      - name: Package app
+        run: ./scripts/package_app.sh
+      - name: Zip app
+        run: ditto -c -k --keepParent dist/StardewModManager.app dist/StardewModManager-macos-arm64.zip
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: StardewModManager-macos-arm64
+          path: dist/StardewModManager-macos-arm64.zip
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/StardewModManager-macos-arm64.zip
