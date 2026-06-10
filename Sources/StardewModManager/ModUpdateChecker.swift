@@ -14,21 +14,6 @@ enum ModUpdateStatus: Equatable, Sendable {
         }
         return false
     }
-
-    var shortLabel: String {
-        switch self {
-        case .notChecked:
-            "未检查"
-        case .checking:
-            "检查中"
-        case .current:
-            "最新"
-        case .updateAvailable:
-            "可更新"
-        case .failed:
-            "检查失败"
-        }
-    }
 }
 
 actor ModUpdateChecker {
@@ -65,7 +50,8 @@ actor ModUpdateChecker {
             }
         } catch {
             for mod in uncachedMods {
-                statuses[mod.id] = .failed(error.localizedDescription)
+                let message = (error as? ModUpdateCheckerError)?.messageKey ?? error.localizedDescription
+                statuses[mod.id] = .failed(message)
             }
         }
 
@@ -158,13 +144,13 @@ private struct SuggestedModUpdate: Decodable {
     let url: URL?
 }
 
-private enum ModUpdateCheckerError: LocalizedError {
+private enum ModUpdateCheckerError: Error {
     case requestFailed
 
-    var errorDescription: String? {
+    var messageKey: String {
         switch self {
         case .requestFailed:
-            "SMAPI 更新检查请求失败"
+            "modUpdate.requestFailed"
         }
     }
 }

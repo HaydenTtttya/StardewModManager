@@ -2,10 +2,16 @@ import StardewModCore
 import SwiftUI
 
 struct ModDetailView: View {
+    @EnvironmentObject private var settings: AppSettings
+
     let mod: ModItem
     let updateStatus: ModUpdateStatus
     let isChangingState: Bool
     let onSetEnabled: (Bool) -> Void
+
+    private var strings: AppStrings {
+        settings.strings
+    }
 
     var body: some View {
         ScrollView {
@@ -42,7 +48,7 @@ struct ModDetailView: View {
                         UpdateStatusBadge(status: updateStatus)
                         Text(mod.manifest.version)
                             .font(.callout.weight(.medium))
-                        Text(mod.manifest.displayAuthor)
+                        Text(strings.authorName(mod.manifest.author))
                             .font(.callout)
                             .foregroundStyle(.secondary)
                     }
@@ -51,7 +57,7 @@ struct ModDetailView: View {
                 Spacer(minLength: 16)
 
                 Toggle(
-                    "启用",
+                    strings.enabledToggle,
                     isOn: Binding(
                         get: { !mod.isDisabled },
                         set: { isEnabled in
@@ -62,7 +68,7 @@ struct ModDetailView: View {
                 .toggleStyle(.switch)
                 .controlSize(.regular)
                 .disabled(isChangingState)
-                .help(mod.isDisabled ? "启用此模组" : "禁用此模组")
+                .help(mod.isDisabled ? strings.enableThisModHelp : strings.disableThisModHelp)
             }
 
             Text(mod.relativePath)
@@ -77,15 +83,15 @@ struct ModDetailView: View {
         if mod.hasIssues || mod.isDisabled {
             VStack(alignment: .leading, spacing: 10) {
                 if mod.isDisabled {
-                    IssueLine(icon: "pause.circle", tint: .secondary, text: "此模组处于禁用状态")
+                    IssueLine(icon: "pause.circle", tint: .secondary, text: strings.modDisabledIssue)
                 }
 
                 if mod.isDuplicateUniqueID {
-                    IssueLine(icon: "doc.on.doc", tint: .orange, text: "检测到重复 UniqueID")
+                    IssueLine(icon: "doc.on.doc", tint: .orange, text: strings.duplicateUniqueIDIssue)
                 }
 
                 ForEach(mod.missingRequiredDependencies, id: \.self) { uniqueID in
-                    IssueLine(icon: "exclamationmark.triangle", tint: .orange, text: "缺少必需依赖：\(uniqueID)")
+                    IssueLine(icon: "exclamationmark.triangle", tint: .orange, text: strings.missingRequiredDependency(uniqueID))
                 }
             }
             .padding(14)
@@ -100,23 +106,27 @@ struct ModDetailView: View {
             HStack(spacing: 8) {
                 ProgressView()
                     .controlSize(.small)
-                Text("正在检查更新...")
+                Text(strings.checkingUpdates)
                     .foregroundStyle(.secondary)
             }
         case .updateAvailable(let version, let url):
             VStack(alignment: .leading, spacing: 10) {
-                IssueLine(icon: "arrow.down.circle", tint: .blue, text: "发现新版本：\(version)（当前 \(mod.manifest.version)）")
+                IssueLine(
+                    icon: "arrow.down.circle",
+                    tint: .blue,
+                    text: strings.foundNewVersion(version: version, currentVersion: mod.manifest.version)
+                )
 
                 if let url {
                     Link(destination: url) {
-                        Label("打开下载页", systemImage: "safari")
+                        Label(strings.openDownloadPage, systemImage: "safari")
                     }
                 }
             }
             .padding(14)
             .background(.blue.opacity(0.10), in: RoundedRectangle(cornerRadius: 8))
         case .failed(let message):
-            IssueLine(icon: "exclamationmark.triangle", tint: .secondary, text: "更新检查失败：\(message)")
+            IssueLine(icon: "exclamationmark.triangle", tint: .secondary, text: strings.updateCheckFailed(message))
                 .padding(14)
                 .background(.quaternary, in: RoundedRectangle(cornerRadius: 8))
         case .notChecked, .current:
@@ -127,16 +137,16 @@ struct ModDetailView: View {
     private var metadataGrid: some View {
         Grid(alignment: .leading, horizontalSpacing: 18, verticalSpacing: 12) {
             MetadataRow(label: "UniqueID", value: mod.manifest.uniqueID)
-            MetadataRow(label: "类型", value: mod.manifest.kind.label)
-            MetadataRow(label: "分类", value: mod.category)
-            MetadataRow(label: "路径", value: mod.folderURL.path)
+            MetadataRow(label: strings.metadataType, value: strings.modKindLabel(mod.manifest.kind))
+            MetadataRow(label: strings.metadataCategory, value: strings.categoryName(mod.category))
+            MetadataRow(label: strings.metadataPath, value: mod.folderURL.path)
 
             if let entryDll = mod.manifest.entryDll {
                 MetadataRow(label: "EntryDll", value: entryDll)
             }
 
             if let contentPackFor = mod.manifest.contentPackFor {
-                MetadataRow(label: "内容包目标", value: contentPackFor.uniqueID)
+                MetadataRow(label: strings.metadataContentPackTarget, value: contentPackFor.uniqueID)
             }
 
             if let minimumApiVersion = mod.manifest.minimumApiVersion {
@@ -144,7 +154,7 @@ struct ModDetailView: View {
             }
 
             if let minimumGameVersion = mod.manifest.minimumGameVersion {
-                MetadataRow(label: "游戏版本", value: minimumGameVersion)
+                MetadataRow(label: strings.metadataGameVersion, value: minimumGameVersion)
             }
         }
         .font(.body)
@@ -153,7 +163,7 @@ struct ModDetailView: View {
     @ViewBuilder
     private var dependencySection: some View {
         if let dependencies = mod.manifest.dependencies, !dependencies.isEmpty {
-            DetailSection(title: "依赖") {
+            DetailSection(title: strings.dependencies) {
                 VStack(alignment: .leading, spacing: 8) {
                     ForEach(dependencies, id: \.uniqueID) { dependency in
                         HStack(spacing: 8) {
@@ -166,7 +176,7 @@ struct ModDetailView: View {
                                     .foregroundStyle(.secondary)
                             }
                             Spacer()
-                            Text(dependency.required ? "必需" : "可选")
+                            Text(dependency.required ? strings.required : strings.optional)
                                 .font(.caption.weight(.semibold))
                                 .foregroundStyle(dependency.required ? .orange : .secondary)
                         }
@@ -179,7 +189,7 @@ struct ModDetailView: View {
     @ViewBuilder
     private var updateKeySection: some View {
         if let updateKeys = mod.manifest.updateKeys, !updateKeys.isEmpty {
-            DetailSection(title: "更新源") {
+            DetailSection(title: strings.updateSources) {
                 VStack(alignment: .leading, spacing: 8) {
                     ForEach(updateKeys, id: \.self) { updateKey in
                         HStack(spacing: 8) {
@@ -198,7 +208,7 @@ struct ModDetailView: View {
     @ViewBuilder
     private var descriptionSection: some View {
         if let description = mod.manifest.description, !description.isEmpty {
-            DetailSection(title: "说明") {
+            DetailSection(title: strings.description) {
                 Text(description)
                     .textSelection(.enabled)
             }
@@ -207,10 +217,16 @@ struct ModDetailView: View {
 }
 
 private struct StatusBadge: View {
+    @EnvironmentObject private var settings: AppSettings
+
     let status: ModStatus
 
+    private var strings: AppStrings {
+        settings.strings
+    }
+
     var body: some View {
-        Text(status.label)
+        Text(strings.modStatusLabel(status))
             .font(.caption.weight(.semibold))
             .padding(.vertical, 4)
             .padding(.horizontal, 8)
@@ -253,7 +269,7 @@ private struct MetadataRow: View {
         GridRow {
             Text(label)
                 .foregroundStyle(.secondary)
-                .frame(width: 90, alignment: .leading)
+                .frame(width: 140, alignment: .leading)
             Text(value)
                 .textSelection(.enabled)
         }

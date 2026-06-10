@@ -13,21 +13,6 @@ enum ModListFilter: String, CaseIterable, Identifiable {
     var id: Self {
         self
     }
-
-    var label: String {
-        switch self {
-        case .all:
-            "全部"
-        case .enabled:
-            "启用"
-        case .attention:
-            "处理"
-        case .updates:
-            "更新"
-        case .disabled:
-            "禁用"
-        }
-    }
 }
 
 @MainActor
@@ -58,6 +43,7 @@ final class ModLibraryViewModel: ObservableObject {
     private var gameProcess: Process?
     private var gameOutputPipe: Pipe?
     private var gameErrorPipe: Pipe?
+    private var gameConsoleLanguage: AppLanguage = .simplifiedChinese
 
     init(rootURL: URL = DefaultModsLocator.bestGuess()) {
         self.rootURL = rootURL
@@ -147,10 +133,11 @@ final class ModLibraryViewModel: ObservableObject {
         }
     }
 
-    func chooseModsFolder() {
+    func chooseModsFolder(language: AppLanguage) {
+        let strings = AppStrings(language: language)
         let panel = NSOpenPanel()
-        panel.title = "选择 Stardew Valley Mods 文件夹"
-        panel.message = "请选择包含 SMAPI 模组的 Mods 文件夹"
+        panel.title = strings.chooseModsFolderTitle
+        panel.message = strings.chooseModsFolderMessage
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
         panel.allowsMultipleSelection = false
@@ -166,10 +153,11 @@ final class ModLibraryViewModel: ObservableObject {
         refresh()
     }
 
-    func chooseAndInstallMod() {
+    func chooseAndInstallMod(language: AppLanguage) {
+        let strings = AppStrings(language: language)
         let panel = NSOpenPanel()
-        panel.title = "安装模组"
-        panel.message = "请选择解压后的模组文件夹，或从 Nexus 下载的 .zip 文件"
+        panel.title = strings.installMod
+        panel.message = strings.installModPanelMessage
         panel.canChooseDirectories = true
         panel.canChooseFiles = true
         panel.allowsMultipleSelection = false
@@ -179,13 +167,14 @@ final class ModLibraryViewModel: ObservableObject {
             return
         }
 
-        installMod(from: sourceURL)
+        installMod(from: sourceURL, language: language)
     }
 
-    func chooseAndInstallTranslation() {
+    func chooseAndInstallTranslation(language: AppLanguage) {
+        let strings = AppStrings(language: language)
         let panel = NSOpenPanel()
-        panel.title = "安装模组翻译"
-        panel.message = "请选择翻译文件夹、单个翻译文件，或 .zip 翻译包"
+        panel.title = strings.installTranslationTitle
+        panel.message = strings.installTranslationPanelMessage
         panel.canChooseDirectories = true
         panel.canChooseFiles = true
         panel.allowsMultipleSelection = false
@@ -195,11 +184,12 @@ final class ModLibraryViewModel: ObservableObject {
             return
         }
 
-        installTranslation(from: sourceURL)
+        installTranslation(from: sourceURL, language: language)
     }
 
-    func installMod(from sourceURL: URL) {
+    func installMod(from sourceURL: URL, language: AppLanguage) {
         let rootURL = rootURL
+        let strings = AppStrings(language: language)
         isInstalling = true
 
         Task {
@@ -210,13 +200,16 @@ final class ModLibraryViewModel: ObservableObject {
 
                 refresh()
                 installNotice = InstallationNotice(
-                    title: "安装完成",
-                    message: installSummary(for: result)
+                    title: strings.installFinishedTitle,
+                    message: strings.installedSummary(
+                        installedCount: result.installedCount,
+                        replacedCount: result.replacedCount
+                    )
                 )
             } catch {
                 installNotice = InstallationNotice(
-                    title: "安装失败",
-                    message: error.localizedDescription
+                    title: strings.installFailedTitle,
+                    message: strings.errorDescription(error)
                 )
             }
 
@@ -224,9 +217,10 @@ final class ModLibraryViewModel: ObservableObject {
         }
     }
 
-    func installTranslation(from sourceURL: URL) {
+    func installTranslation(from sourceURL: URL, language: AppLanguage) {
         let rootURL = rootURL
         let targetModURL = selectedMod?.folderURL
+        let strings = AppStrings(language: language)
         isInstalling = true
 
         Task {
@@ -241,13 +235,17 @@ final class ModLibraryViewModel: ObservableObject {
 
                 refresh()
                 installNotice = InstallationNotice(
-                    title: "翻译安装完成",
-                    message: translationSummary(for: result)
+                    title: strings.translationInstallFinishedTitle,
+                    message: strings.translationSummary(
+                        installedCount: result.installedCount,
+                        createdCount: result.createdCount,
+                        overwrittenCount: result.overwrittenCount
+                    )
                 )
             } catch {
                 installNotice = InstallationNotice(
-                    title: "翻译安装失败",
-                    message: error.localizedDescription
+                    title: strings.translationInstallFailedTitle,
+                    message: strings.errorDescription(error)
                 )
             }
 
@@ -262,19 +260,20 @@ final class ModLibraryViewModel: ObservableObject {
         NSWorkspace.shared.activateFileViewerSelecting([selectedMod.folderURL])
     }
 
-    func toggleSelectedModEnabled() {
+    func toggleSelectedModEnabled(language: AppLanguage) {
         guard let selectedMod else {
             return
         }
 
-        setMod(selectedMod, enabled: selectedMod.isDisabled)
+        setMod(selectedMod, enabled: selectedMod.isDisabled, language: language)
     }
 
-    func setMod(_ mod: ModItem, enabled isEnabled: Bool) {
+    func setMod(_ mod: ModItem, enabled isEnabled: Bool, language: AppLanguage) {
         guard !isChangingModState else {
             return
         }
 
+        let strings = AppStrings(language: language)
         isChangingModState = true
         defer {
             isChangingModState = false
@@ -292,24 +291,27 @@ final class ModLibraryViewModel: ObservableObject {
             ensureSelectedModMatchesCurrentFilter()
 
             installNotice = InstallationNotice(
-                title: isEnabled ? "已启用模组" : "已禁用模组",
+                title: isEnabled ? strings.modEnabledTitle : strings.modDisabledTitle,
                 message: "\(mod.manifest.name)\n\(result.destinationURL.lastPathComponent)"
             )
         } catch {
             installNotice = InstallationNotice(
-                title: isEnabled ? "启用失败" : "禁用失败",
-                message: error.localizedDescription
+                title: isEnabled ? strings.enableFailedTitle : strings.disableFailedTitle,
+                message: strings.errorDescription(error)
             )
         }
     }
 
-    func launchGame() {
+    func launchGame(language: AppLanguage) {
+        let strings = AppStrings(language: language)
+        gameConsoleLanguage = language
         let executableURL = smapiExecutableURL
         guard FileManager.default.fileExists(atPath: executableURL.path) else {
-            appendGameConsoleLine("启动失败：找不到 StardewModdingAPI：\(executableURL.path)")
+            let message = strings.smapiNotFound(executableURL.path)
+            appendGameConsoleLine(strings.launchFailed(message))
             installNotice = InstallationNotice(
-                title: "启动失败",
-                message: "找不到 StardewModdingAPI：\(executableURL.path)"
+                title: strings.launchFailedTitle,
+                message: message
             )
             return
         }
@@ -362,22 +364,24 @@ final class ModLibraryViewModel: ObservableObject {
             try process.run()
 
             installNotice = InstallationNotice(
-                title: "正在启动游戏",
-                message: "已通过 StardewModdingAPI 启动：\(executableURL.path)"
+                title: strings.launchingGameTitle,
+                message: strings.launchedGame(executableURL.path)
             )
         } catch {
-            appendGameConsoleLine("启动失败：\(error.localizedDescription)")
+            appendGameConsoleLine(strings.launchFailed(strings.errorDescription(error)))
             installNotice = InstallationNotice(
-                title: "启动失败",
-                message: error.localizedDescription
+                title: strings.launchFailedTitle,
+                message: strings.errorDescription(error)
             )
             finishGameProcess(status: nil)
         }
     }
 
-    func stopGame() {
+    func stopGame(language: AppLanguage) {
+        let strings = AppStrings(language: language)
+        gameConsoleLanguage = language
         guard let gameProcess else {
-            appendGameConsoleLine("没有正在运行的游戏进程。")
+            appendGameConsoleLine(strings.noRunningGameProcess)
             isGameRunning = false
             return
         }
@@ -387,7 +391,7 @@ final class ModLibraryViewModel: ObservableObject {
             return
         }
 
-        appendGameConsoleLine("\n正在停止进程：\(gameProcess.processIdentifier)")
+        appendGameConsoleLine("\n\(strings.stoppingProcess(gameProcess.processIdentifier))")
         gameProcess.terminate()
     }
 
@@ -426,24 +430,13 @@ final class ModLibraryViewModel: ObservableObject {
         isGameRunning = false
 
         if let status {
-            appendGameConsoleLine("\n进程已退出，退出码：\(status)")
+            let strings = AppStrings(language: gameConsoleLanguage)
+            appendGameConsoleLine("\n\(strings.processExited(status: status))")
         }
     }
 
     private func shellQuoted(_ path: String) -> String {
         "'" + path.replacingOccurrences(of: "'", with: "'\\''") + "'"
-    }
-
-    private func installSummary(for result: ModInstallResult) -> String {
-        if result.replacedCount > 0 {
-            return "已安装 \(result.installedCount) 个模组，并先删除后替换了 \(result.replacedCount) 个已有模组。"
-        }
-
-        return "已安装 \(result.installedCount) 个模组。"
-    }
-
-    private func translationSummary(for result: ModTranslationInstallResult) -> String {
-        "已安装 \(result.installedCount) 个翻译文件，其中新增 \(result.createdCount) 个，覆盖 \(result.overwrittenCount) 个。"
     }
 
     private func resolveNexusCategories(for scannedMods: [ModItem]) {

@@ -3,6 +3,11 @@ import SwiftUI
 
 struct ContentView: View {
     @EnvironmentObject private var library: ModLibraryViewModel
+    @EnvironmentObject private var settings: AppSettings
+
+    private var strings: AppStrings {
+        settings.strings
+    }
 
     var body: some View {
         NavigationSplitView {
@@ -13,85 +18,85 @@ struct ContentView: View {
         .toolbar {
             ToolbarItemGroup {
                 Button {
-                    library.chooseAndInstallMod()
+                    library.chooseAndInstallMod(language: settings.language)
                 } label: {
-                    Label("安装模组", systemImage: "square.and.arrow.down")
+                    Label(strings.installMod, systemImage: "square.and.arrow.down")
                 }
                 .disabled(library.isInstalling)
-                .help("安装文件夹或 zip 模组包")
+                .help(strings.installModHelp)
 
                 Button {
-                    library.chooseAndInstallTranslation()
+                    library.chooseAndInstallTranslation(language: settings.language)
                 } label: {
-                    Label("安装翻译", systemImage: "globe.asia.australia")
+                    Label(strings.installTranslation, systemImage: "globe.asia.australia")
                 }
                 .disabled(library.isInstalling)
-                .help("安装翻译文件夹、翻译文件或 zip 翻译包")
+                .help(strings.installTranslationHelp)
 
                 Button {
                     if library.isGameRunning {
-                        library.stopGame()
+                        library.stopGame(language: settings.language)
                     } else {
-                        library.launchGame()
+                        library.launchGame(language: settings.language)
                     }
                 } label: {
                     if library.isGameRunning {
-                        Label("停止进程", systemImage: "stop.fill")
+                        Label(strings.stopProcess, systemImage: "stop.fill")
                     } else {
-                        Label("启动游戏", systemImage: "play.fill")
+                        Label(strings.startGame, systemImage: "play.fill")
                     }
                 }
                 .disabled(library.isInstalling)
-                .help(library.isGameRunning ? "停止当前 StardewModdingAPI 进程" : "通过 StardewModdingAPI 启动游戏")
+                .help(library.isGameRunning ? strings.stopGameHelp : strings.startGameHelp)
 
                 Button {
-                    library.chooseModsFolder()
+                    library.chooseModsFolder(language: settings.language)
                 } label: {
-                    Label("选择目录", systemImage: "folder")
+                    Label(strings.chooseDirectory, systemImage: "folder")
                 }
-                .help("选择 Mods 文件夹")
+                .help(strings.chooseModsFolderHelp)
 
                 Button {
                     library.refresh()
                 } label: {
-                    Label("刷新", systemImage: "arrow.clockwise")
+                    Label(strings.refresh, systemImage: "arrow.clockwise")
                 }
-                .help("重新扫描")
+                .help(strings.refreshHelp)
 
                 Button {
                     library.checkForModUpdates()
                 } label: {
-                    Label("检查更新", systemImage: "arrow.triangle.2.circlepath")
+                    Label(strings.checkUpdates, systemImage: "arrow.triangle.2.circlepath")
                 }
                 .disabled(library.isCheckingUpdates || library.mods.isEmpty)
-                .help("检查已安装模组是否有新版本")
+                .help(strings.checkUpdatesHelp)
 
                 Button {
-                    library.toggleSelectedModEnabled()
+                    library.toggleSelectedModEnabled(language: settings.language)
                 } label: {
                     if library.selectedMod?.isDisabled == true {
-                        Label("启用模组", systemImage: "power.circle")
+                        Label(strings.enableMod, systemImage: "power.circle")
                     } else {
-                        Label("禁用模组", systemImage: "pause.circle")
+                        Label(strings.disableMod, systemImage: "pause.circle")
                     }
                 }
                 .disabled(library.selectedMod == nil || library.isInstalling || library.isChangingModState)
-                .help(library.selectedMod?.isDisabled == true ? "启用选中的模组" : "禁用选中的模组")
+                .help(library.selectedMod?.isDisabled == true ? strings.enableSelectedModHelp : strings.disableSelectedModHelp)
 
                 Button {
                     library.revealSelectedModInFinder()
                 } label: {
-                    Label("在 Finder 中显示", systemImage: "magnifyingglass")
+                    Label(strings.revealInFinder, systemImage: "magnifyingglass")
                 }
                 .disabled(library.selectedMod == nil)
-                .help("在 Finder 中显示选中的模组")
+                .help(strings.revealInFinderHelp)
             }
         }
         .alert(item: $library.installNotice) { notice in
             Alert(
                 title: Text(notice.title),
                 message: Text(notice.message),
-                dismissButton: .default(Text("好"))
+                dismissButton: .default(Text(strings.ok))
             )
         }
     }
@@ -99,6 +104,7 @@ struct ContentView: View {
 
 private struct DetailPaneView: View {
     @EnvironmentObject private var library: ModLibraryViewModel
+    @EnvironmentObject private var settings: AppSettings
 
     var body: some View {
         VStack(spacing: 0) {
@@ -109,7 +115,7 @@ private struct DetailPaneView: View {
                         updateStatus: library.updateStatus(for: mod),
                         isChangingState: library.isChangingModState,
                         onSetEnabled: { isEnabled in
-                            library.setMod(mod, enabled: isEnabled)
+                            library.setMod(mod, enabled: isEnabled, language: settings.language)
                         }
                     )
                 } else {
@@ -128,26 +134,31 @@ private struct DetailPaneView: View {
 
 private struct GameConsoleView: View {
     @EnvironmentObject private var library: ModLibraryViewModel
+    @EnvironmentObject private var settings: AppSettings
+
+    private var strings: AppStrings {
+        settings.strings
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 8) {
                 Image(systemName: "terminal")
                     .foregroundStyle(.secondary)
-                Text("游戏终端")
+                Text(strings.gameConsole)
                     .font(.headline)
 
                 if library.isGameRunning {
                     ProgressView()
                         .controlSize(.small)
-                    Text("运行中")
+                    Text(strings.running)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
 
                 Spacer()
 
-                Button("清空") {
+                Button(strings.clear) {
                     library.clearGameConsole()
                 }
                 .disabled(library.gameConsoleText.isEmpty)
@@ -180,7 +191,7 @@ private struct GameConsoleView: View {
 
     private var consoleText: String {
         library.gameConsoleText.isEmpty
-            ? "启动游戏后，SMAPI 的加载日志会显示在这里。"
+            ? strings.gameConsolePlaceholder
             : library.gameConsoleText
     }
 
@@ -259,6 +270,11 @@ private struct GameConsoleView: View {
 
 private struct SidebarView: View {
     @EnvironmentObject private var library: ModLibraryViewModel
+    @EnvironmentObject private var settings: AppSettings
+
+    private var strings: AppStrings {
+        settings.strings
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -273,7 +289,7 @@ private struct SidebarView: View {
                 }
             }
             .listStyle(.sidebar)
-            .searchable(text: $library.searchText, placement: .sidebar, prompt: "搜索模组")
+            .searchable(text: $library.searchText, placement: .sidebar, prompt: strings.searchModsPrompt)
 
             if !library.scanErrors.isEmpty {
                 Divider()
@@ -286,6 +302,11 @@ private struct SidebarView: View {
 
 private struct HeaderView: View {
     @EnvironmentObject private var library: ModLibraryViewModel
+    @EnvironmentObject private var settings: AppSettings
+
+    private var strings: AppStrings {
+        settings.strings
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -318,14 +339,14 @@ private struct HeaderView: View {
                         library.selectedFilter = filter
                     } label: {
                         SummaryPill(
-                            title: filter.label,
+                            title: strings.filterLabel(filter),
                             value: library.count(for: filter),
                             tint: filterTint(for: filter),
                             isSelected: library.selectedFilter == filter
                         )
                     }
                     .buttonStyle(.plain)
-                    .help("筛选\(filter.label)模组")
+                    .help(strings.filterHelp(filter))
                 }
             }
         }
@@ -379,8 +400,14 @@ private struct SummaryPill: View {
 }
 
 private struct ModRowView: View {
+    @EnvironmentObject private var settings: AppSettings
+
     let mod: ModItem
     let updateStatus: ModUpdateStatus
+
+    private var strings: AppStrings {
+        settings.strings
+    }
 
     var body: some View {
         HStack(spacing: 10) {
@@ -396,8 +423,8 @@ private struct ModRowView: View {
 
                 HStack(spacing: 6) {
                     Text(mod.manifest.version)
-                    Text(mod.manifest.kind.label)
-                    Text(mod.category)
+                    Text(strings.modKindLabel(mod.manifest.kind))
+                    Text(strings.categoryName(mod.category))
                 }
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -408,7 +435,7 @@ private struct ModRowView: View {
 
             UpdateStatusBadge(status: updateStatus, compact: true)
 
-            Text(mod.status.label)
+            Text(strings.modStatusLabel(mod.status))
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(statusTint)
         }
@@ -441,8 +468,14 @@ private struct ModRowView: View {
 }
 
 struct UpdateStatusBadge: View {
+    @EnvironmentObject private var settings: AppSettings
+
     let status: ModUpdateStatus
     var compact = false
+
+    private var strings: AppStrings {
+        settings.strings
+    }
 
     var body: some View {
         switch status {
@@ -450,7 +483,7 @@ struct UpdateStatusBadge: View {
             ProgressView()
                 .controlSize(.small)
         case .updateAvailable(let version, _):
-            Text(compact ? "更新" : "可更新到 \(version)")
+            Text(compact ? strings.updateCompact : strings.updateAvailable(version: version))
                 .font(.caption.weight(.semibold))
                 .padding(.vertical, 3)
                 .padding(.horizontal, 7)
@@ -458,7 +491,7 @@ struct UpdateStatusBadge: View {
                 .background(.blue.opacity(0.12), in: Capsule())
         case .failed:
             if !compact {
-                Text(status.shortLabel)
+                Text(strings.updateStatusShortLabel(status))
                     .font(.caption.weight(.semibold))
                     .padding(.vertical, 3)
                     .padding(.horizontal, 7)
@@ -472,13 +505,19 @@ struct UpdateStatusBadge: View {
 }
 
 private struct ScanErrorStrip: View {
+    @EnvironmentObject private var settings: AppSettings
+
     let count: Int
+
+    private var strings: AppStrings {
+        settings.strings
+    }
 
     var body: some View {
         HStack(spacing: 8) {
             Image(systemName: "exclamationmark.triangle")
                 .foregroundStyle(.orange)
-            Text("\(count) 个 manifest 读取失败")
+            Text(strings.scanErrorCount(count))
                 .font(.caption)
                 .foregroundStyle(.secondary)
             Spacer()
@@ -488,12 +527,18 @@ private struct ScanErrorStrip: View {
 }
 
 private struct EmptyStateView: View {
+    @EnvironmentObject private var settings: AppSettings
+
+    private var strings: AppStrings {
+        settings.strings
+    }
+
     var body: some View {
         VStack(spacing: 12) {
             Image(systemName: "square.stack.3d.up.slash")
                 .font(.system(size: 42))
                 .foregroundStyle(.secondary)
-            Text("没有可显示的模组")
+            Text(strings.noMods)
                 .font(.title3.weight(.semibold))
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
