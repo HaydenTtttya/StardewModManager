@@ -4,6 +4,8 @@ import SwiftUI
 struct ModDetailView: View {
     let mod: ModItem
     let updateStatus: ModUpdateStatus
+    let isChangingState: Bool
+    let onSetEnabled: (Bool) -> Void
 
     var body: some View {
         ScrollView {
@@ -45,6 +47,22 @@ struct ModDetailView: View {
                             .foregroundStyle(.secondary)
                     }
                 }
+
+                Spacer(minLength: 16)
+
+                Toggle(
+                    "启用",
+                    isOn: Binding(
+                        get: { !mod.isDisabled },
+                        set: { isEnabled in
+                            onSetEnabled(isEnabled)
+                        }
+                    )
+                )
+                .toggleStyle(.switch)
+                .controlSize(.regular)
+                .disabled(isChangingState)
+                .help(mod.isDisabled ? "启用此模组" : "禁用此模组")
             }
 
             Text(mod.relativePath)

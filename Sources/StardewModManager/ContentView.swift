@@ -67,6 +67,18 @@ struct ContentView: View {
                 .help("检查已安装模组是否有新版本")
 
                 Button {
+                    library.toggleSelectedModEnabled()
+                } label: {
+                    if library.selectedMod?.isDisabled == true {
+                        Label("启用模组", systemImage: "power.circle")
+                    } else {
+                        Label("禁用模组", systemImage: "pause.circle")
+                    }
+                }
+                .disabled(library.selectedMod == nil || library.isInstalling || library.isChangingModState)
+                .help(library.selectedMod?.isDisabled == true ? "启用选中的模组" : "禁用选中的模组")
+
+                Button {
                     library.revealSelectedModInFinder()
                 } label: {
                     Label("在 Finder 中显示", systemImage: "magnifyingglass")
@@ -92,7 +104,14 @@ private struct DetailPaneView: View {
         VStack(spacing: 0) {
             Group {
                 if let mod = library.selectedMod {
-                    ModDetailView(mod: mod, updateStatus: library.updateStatus(for: mod))
+                    ModDetailView(
+                        mod: mod,
+                        updateStatus: library.updateStatus(for: mod),
+                        isChangingState: library.isChangingModState,
+                        onSetEnabled: { isEnabled in
+                            library.setMod(mod, enabled: isEnabled)
+                        }
+                    )
                 } else {
                     EmptyStateView()
                 }
@@ -283,7 +302,11 @@ private struct HeaderView: View {
 
                 Spacer()
 
-                if library.isScanning || library.isInstalling || library.isGameRunning || library.isCheckingUpdates {
+                if library.isScanning
+                    || library.isInstalling
+                    || library.isChangingModState
+                    || library.isGameRunning
+                    || library.isCheckingUpdates {
                     ProgressView()
                         .controlSize(.small)
                 }

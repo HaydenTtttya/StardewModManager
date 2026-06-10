@@ -153,6 +153,76 @@ func scanMarksDisabledFolders() throws {
 }
 
 @Test
+func modStateControllerDisablesModByRenamingFolder() throws {
+    let fileManager = FileManager.default
+    let root = fileManager.temporaryDirectory
+        .appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? fileManager.removeItem(at: root) }
+
+    let modFolder = root.appendingPathComponent("ExampleMod", isDirectory: true)
+    try fileManager.createDirectory(at: modFolder, withIntermediateDirectories: true)
+    try writeManifest(name: "Example Mod", version: "1.0.0", uniqueID: "Example.Mod", to: modFolder)
+
+    let mod = try #require(ModScanner.scan(rootURL: root).mods.first)
+    let result = try ModStateController.setEnabled(false, for: mod, fileManager: fileManager)
+    let scanResult = ModScanner.scan(rootURL: root, fileManager: fileManager)
+
+    #expect(result.destinationURL.lastPathComponent == "ExampleMod.disabled")
+    #expect(!fileManager.fileExists(atPath: modFolder.path))
+    #expect(fileManager.fileExists(atPath: result.destinationURL.path))
+    #expect(scanResult.mods.first?.isDisabled == true)
+    #expect(scanResult.mods.first?.status == .disabled)
+}
+
+@Test
+func modStateControllerEnablesModByRenamingFolder() throws {
+    let fileManager = FileManager.default
+    let root = fileManager.temporaryDirectory
+        .appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? fileManager.removeItem(at: root) }
+
+    let modFolder = root.appendingPathComponent("ExampleMod.disabled", isDirectory: true)
+    try fileManager.createDirectory(at: modFolder, withIntermediateDirectories: true)
+    try writeManifest(name: "Example Mod", version: "1.0.0", uniqueID: "Example.Mod", to: modFolder)
+
+    let mod = try #require(ModScanner.scan(rootURL: root).mods.first)
+    let result = try ModStateController.setEnabled(true, for: mod, fileManager: fileManager)
+    let scanResult = ModScanner.scan(rootURL: root, fileManager: fileManager)
+
+    #expect(result.destinationURL.lastPathComponent == "ExampleMod")
+    #expect(!fileManager.fileExists(atPath: modFolder.path))
+    #expect(fileManager.fileExists(atPath: result.destinationURL.path))
+    #expect(scanResult.mods.first?.isDisabled == false)
+    #expect(scanResult.mods.first?.status == .enabled)
+}
+
+@Test
+func modStateControllerDoesNotEnableWholeDisabledParentFolder() throws {
+    let fileManager = FileManager.default
+    let root = fileManager.temporaryDirectory
+        .appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? fileManager.removeItem(at: root) }
+
+    let groupFolder = root.appendingPathComponent(".Disabled Group", isDirectory: true)
+    let modFolder = groupFolder.appendingPathComponent("ExampleMod", isDirectory: true)
+    try fileManager.createDirectory(at: modFolder, withIntermediateDirectories: true)
+    try writeManifest(name: "Example Mod", version: "1.0.0", uniqueID: "Example.Mod", to: modFolder)
+
+    let mod = try #require(ModScanner.scan(rootURL: root).mods.first)
+
+    do {
+        _ = try ModStateController.setEnabled(true, for: mod, fileManager: fileManager)
+        Issue.record("Expected enabling a mod disabled by a parent folder to fail.")
+    } catch let error as ModStateChangeError {
+        #expect(error == .disabledByParentDirectory(mod.folderURL.standardizedFileURL))
+    } catch {
+        Issue.record("Unexpected error: \(error)")
+    }
+
+    #expect(fileManager.fileExists(atPath: modFolder.path))
+}
+
+@Test
 func installReplacesExistingModByDeletingOldFolderFirst() throws {
     let fileManager = FileManager.default
     let tempRoot = fileManager.temporaryDirectory

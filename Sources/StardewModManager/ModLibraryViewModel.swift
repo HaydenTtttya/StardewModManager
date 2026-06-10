@@ -44,6 +44,7 @@ final class ModLibraryViewModel: ObservableObject {
     }
     @Published private(set) var isScanning = false
     @Published private(set) var isInstalling = false
+    @Published private(set) var isChangingModState = false
     @Published private(set) var isGameRunning = false
     @Published private(set) var isCheckingUpdates = false
     @Published private(set) var gameConsoleText = ""
@@ -259,6 +260,47 @@ final class ModLibraryViewModel: ObservableObject {
             return
         }
         NSWorkspace.shared.activateFileViewerSelecting([selectedMod.folderURL])
+    }
+
+    func toggleSelectedModEnabled() {
+        guard let selectedMod else {
+            return
+        }
+
+        setMod(selectedMod, enabled: selectedMod.isDisabled)
+    }
+
+    func setMod(_ mod: ModItem, enabled isEnabled: Bool) {
+        guard !isChangingModState else {
+            return
+        }
+
+        isChangingModState = true
+        defer {
+            isChangingModState = false
+        }
+
+        do {
+            let result = try ModStateController.setEnabled(isEnabled, for: mod)
+            let uniqueID = mod.manifest.uniqueID
+            refresh()
+            selectedModID = mods.first { candidate in
+                candidate.folderURL.standardizedFileURL == result.destinationURL.standardizedFileURL
+            }?.id ?? mods.first { candidate in
+                candidate.manifest.uniqueID.caseInsensitiveCompare(uniqueID) == .orderedSame
+            }?.id
+            ensureSelectedModMatchesCurrentFilter()
+
+            installNotice = InstallationNotice(
+                title: isEnabled ? "已启用模组" : "已禁用模组",
+                message: "\(mod.manifest.name)\n\(result.destinationURL.lastPathComponent)"
+            )
+        } catch {
+            installNotice = InstallationNotice(
+                title: isEnabled ? "启用失败" : "禁用失败",
+                message: error.localizedDescription
+            )
+        }
     }
 
     func launchGame() {
