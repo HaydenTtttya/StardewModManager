@@ -3,6 +3,11 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 APP_NAME="StardewModManager"
+DISPLAY_NAME="Stardew Mod Manager"
+BUNDLE_ID="dev.openstardew.StardewModManager"
+VERSION="${VERSION:-0.2.0}"
+BUILD_NUMBER="${BUILD_NUMBER:-$(git -C "$ROOT_DIR" rev-list --count HEAD 2>/dev/null || printf '1')}"
+BUILD_ARCHS="${BUILD_ARCHS:-$(uname -m)}"
 APP_DIR="$ROOT_DIR/dist/$APP_NAME.app"
 CONTENTS_DIR="$APP_DIR/Contents"
 MACOS_DIR="$CONTENTS_DIR/MacOS"
@@ -10,12 +15,19 @@ RESOURCES_DIR="$CONTENTS_DIR/Resources"
 APP_ICON="$ROOT_DIR/Resources/AppIcon.icns"
 
 cd "$ROOT_DIR"
-swift build -c release
+IFS=',' read -r -a ARCHITECTURES <<<"$BUILD_ARCHS"
+BUILD_ARGUMENTS=()
+for architecture in "${ARCHITECTURES[@]}"; do
+  BUILD_ARGUMENTS+=(--arch "$architecture")
+done
+
+swift build -c release "${BUILD_ARGUMENTS[@]}"
+BUILD_BINARY="$(swift build -c release "${BUILD_ARGUMENTS[@]}" --show-bin-path)/$APP_NAME"
 
 rm -rf "$APP_DIR"
 mkdir -p "$MACOS_DIR" "$RESOURCES_DIR"
 
-cp "$ROOT_DIR/.build/release/$APP_NAME" "$MACOS_DIR/$APP_NAME"
+cp "$BUILD_BINARY" "$MACOS_DIR/$APP_NAME"
 chmod +x "$MACOS_DIR/$APP_NAME"
 cp "$APP_ICON" "$RESOURCES_DIR/AppIcon.icns"
 
@@ -29,19 +41,21 @@ cat > "$CONTENTS_DIR/Info.plist" <<PLIST
   <key>CFBundleExecutable</key>
   <string>$APP_NAME</string>
   <key>CFBundleIdentifier</key>
-  <string>dev.openstardew.$APP_NAME</string>
+  <string>$BUNDLE_ID</string>
   <key>CFBundleInfoDictionaryVersion</key>
   <string>6.0</string>
   <key>CFBundleIconFile</key>
   <string>AppIcon</string>
   <key>CFBundleName</key>
-  <string>Stardew Mod Manager</string>
+  <string>$DISPLAY_NAME</string>
+  <key>CFBundleDisplayName</key>
+  <string>$DISPLAY_NAME</string>
   <key>CFBundlePackageType</key>
   <string>APPL</string>
   <key>CFBundleShortVersionString</key>
-  <string>0.1.0</string>
+  <string>$VERSION</string>
   <key>CFBundleVersion</key>
-  <string>1</string>
+  <string>$BUILD_NUMBER</string>
   <key>LSMinimumSystemVersion</key>
   <string>14.0</string>
   <key>NSHighResolutionCapable</key>
@@ -52,4 +66,8 @@ cat > "$CONTENTS_DIR/Info.plist" <<PLIST
 </plist>
 PLIST
 
-echo "Created $APP_DIR"
+/usr/bin/codesign --force --deep --sign - "$APP_DIR"
+/usr/bin/codesign --verify --deep --strict "$APP_DIR"
+
+echo "Created ad-hoc signed app: $APP_DIR"
+echo "Architectures: $(/usr/bin/lipo -archs "$MACOS_DIR/$APP_NAME")"

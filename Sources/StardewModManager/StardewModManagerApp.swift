@@ -20,6 +20,7 @@ struct StardewModManagerApp: App {
         .windowStyle(.titleBar)
         .commands {
             CommandGroup(replacing: .newItem) {}
+            StardewCommands(library: library, settings: settings)
         }
 
         Settings {

@@ -38,15 +38,20 @@ final class ModLibraryViewModel: ObservableObject {
 
     private let nexusCategoryResolver = NexusCategoryResolver()
     private let modUpdateChecker = ModUpdateChecker()
+    private let folderStore: ModsFolderStore
+    private let gameProcessController: GameProcessController
     private var categoryLookupTask: Task<Void, Never>?
     private var updateLookupTask: Task<Void, Never>?
-    private var gameProcess: Process?
-    private var gameOutputPipe: Pipe?
-    private var gameErrorPipe: Pipe?
     private var gameConsoleLanguage: AppLanguage = .simplifiedChinese
 
-    init(rootURL: URL = DefaultModsLocator.bestGuess()) {
-        self.rootURL = rootURL
+    init(
+        rootURL: URL? = nil,
+        folderStore: ModsFolderStore = ModsFolderStore(),
+        gameProcessController: GameProcessController = GameProcessController()
+    ) {
+        self.folderStore = folderStore
+        self.gameProcessController = gameProcessController
+        self.rootURL = rootURL ?? folderStore.load() ?? DefaultModsLocator.bestGuess()
         refresh()
     }
 
@@ -148,6 +153,7 @@ final class ModLibraryViewModel: ObservableObject {
         }
 
         rootURL = selectedURL
+        folderStore.save(selectedURL)
         selectedModID = nil
         selectedFilter = .all
         refresh()
@@ -257,7 +263,11 @@ final class ModLibraryViewModel: ObservableObject {
         guard let selectedMod else {
             return
         }
-        NSWorkspace.shared.activateFileViewerSelecting([selectedMod.folderURL])
+        revealModInFinder(selectedMod)
+    }
+
+    func revealModInFinder(_ mod: ModItem) {
+        NSWorkspace.shared.activateFileViewerSelecting([mod.folderURL])
     }
 
     func toggleSelectedModEnabled(language: AppLanguage) {
@@ -317,51 +327,17 @@ final class ModLibraryViewModel: ObservableObject {
         }
 
         do {
-            let process = Process()
-            let outputPipe = Pipe()
-            let errorPipe = Pipe()
-            process.executableURL = executableURL
-            process.currentDirectoryURL = executableURL.deletingLastPathComponent()
-            process.standardOutput = outputPipe
-            process.standardError = errorPipe
-
-            outputPipe.fileHandleForReading.readabilityHandler = { [weak self] handle in
-                let data = handle.availableData
-                guard !data.isEmpty else {
-                    return
-                }
-
-                let text = String(decoding: data, as: UTF8.self)
-                Task { @MainActor [weak self] in
-                    self?.appendGameConsole(text)
-                }
-            }
-
-            errorPipe.fileHandleForReading.readabilityHandler = { [weak self] handle in
-                let data = handle.availableData
-                guard !data.isEmpty else {
-                    return
-                }
-
-                let text = String(decoding: data, as: UTF8.self)
-                Task { @MainActor [weak self] in
-                    self?.appendGameConsole(text)
-                }
-            }
-
-            process.terminationHandler = { [weak self] process in
-                let status = process.terminationStatus
-                Task { @MainActor [weak self] in
-                    self?.finishGameProcess(status: status)
-                }
-            }
-
-            gameProcess = process
-            gameOutputPipe = outputPipe
-            gameErrorPipe = errorPipe
             isGameRunning = true
             resetGameConsole(for: executableURL)
-            try process.run()
+            try gameProcessController.launch(
+                executableURL: executableURL,
+                onOutput: { [weak self] text in
+                    self?.appendGameConsole(text)
+                },
+                onTermination: { [weak self] status in
+                    self?.finishGameProcess(status: status)
+                }
+            )
 
             installNotice = InstallationNotice(
                 title: strings.launchingGameTitle,
@@ -380,19 +356,16 @@ final class ModLibraryViewModel: ObservableObject {
     func stopGame(language: AppLanguage) {
         let strings = AppStrings(language: language)
         gameConsoleLanguage = language
-        guard let gameProcess else {
+        guard gameProcessController.isRunning else {
             appendGameConsoleLine(strings.noRunningGameProcess)
             isGameRunning = false
             return
         }
 
-        guard gameProcess.isRunning else {
-            finishGameProcess(status: gameProcess.terminationStatus)
-            return
+        if let processIdentifier = gameProcessController.processIdentifier {
+            appendGameConsoleLine("\n\(strings.stoppingProcess(processIdentifier))")
         }
-
-        appendGameConsoleLine("\n\(strings.stoppingProcess(gameProcess.processIdentifier))")
-        gameProcess.terminate()
+        gameProcessController.stop()
     }
 
     func clearGameConsole() {
@@ -422,11 +395,6 @@ final class ModLibraryViewModel: ObservableObject {
     }
 
     private func finishGameProcess(status: Int32?) {
-        gameOutputPipe?.fileHandleForReading.readabilityHandler = nil
-        gameErrorPipe?.fileHandleForReading.readabilityHandler = nil
-        gameOutputPipe = nil
-        gameErrorPipe = nil
-        gameProcess = nil
         isGameRunning = false
 
         if let status {

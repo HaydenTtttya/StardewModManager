@@ -148,31 +148,76 @@ public enum ModInstaller {
         let currentMods = ModScanner.scan(rootURL: rootURL, fileManager: fileManager).mods
         let modsToRemove = currentMods.filter { incomingIDs.contains($0.manifest.uniqueID.lowercased()) }
 
-        for mod in modsToRemove where fileManager.fileExists(atPath: mod.folderURL.path) {
-            try fileManager.removeItem(at: mod.folderURL)
+        let transactionURL = rootURL
+            .appendingPathComponent(".stardew-mod-manager-transaction-\(UUID().uuidString)", isDirectory: true)
+        let stagedRootURL = transactionURL.appendingPathComponent("Staged", isDirectory: true)
+        let backupRootURL = transactionURL.appendingPathComponent("Backup", isDirectory: true)
+        try fileManager.createDirectory(at: stagedRootURL, withIntermediateDirectories: true)
+        try fileManager.createDirectory(at: backupRootURL, withIntermediateDirectories: true)
+        defer {
+            try? fileManager.removeItem(at: transactionURL)
         }
 
-        var installedMods: [InstalledMod] = []
+        var installationPlans: [InstallationPlan] = []
         var usedDestinationNames = Set<String>()
-        for package in packages {
+        for (index, package) in packages.enumerated() {
             let destinationBaseName = destinationFolderName(
                 for: package,
                 workingSourceURL: workingSourceURL,
                 sourceIsZip: sourceIsZip
             )
-            let destinationURL = try uniqueDestinationURL(
-                named: destinationBaseName,
-                in: rootURL,
-                usedDestinationNames: &usedDestinationNames,
-                fileManager: fileManager
-            )
-            try fileManager.copyItem(at: package.folderURL, to: destinationURL)
-            installedMods.append(
-                InstalledMod(
-                    manifest: package.manifest,
-                    sourceURL: package.folderURL,
-                    destinationURL: destinationURL
+            let replacementURL = modsToRemove.first { mod in
+                mod.manifest.uniqueID.caseInsensitiveCompare(package.manifest.uniqueID) == .orderedSame
+            }?.folderURL.standardizedFileURL
+            let destinationURL: URL
+            if let replacementURL,
+               usedDestinationNames.insert(replacementURL.path).inserted {
+                destinationURL = replacementURL
+            } else {
+                destinationURL = try uniqueDestinationURL(
+                    named: destinationBaseName,
+                    in: rootURL,
+                    usedDestinationNames: &usedDestinationNames,
+                    fileManager: fileManager
                 )
+            }
+            let stagedURL = stagedRootURL.appendingPathComponent("\(index)", isDirectory: true)
+            try fileManager.copyItem(at: package.folderURL, to: stagedURL)
+            installationPlans.append(
+                InstallationPlan(package: package, stagedURL: stagedURL, destinationURL: destinationURL)
+            )
+        }
+
+        let backupCandidates = topLevelReplacementFolders(from: modsToRemove)
+        var backups: [ReplacementBackup] = []
+        var installedDestinations: [URL] = []
+
+        do {
+            for (index, originalURL) in backupCandidates.enumerated()
+                where fileManager.fileExists(atPath: originalURL.path) {
+                let backupURL = backupRootURL.appendingPathComponent("\(index)", isDirectory: true)
+                try fileManager.moveItem(at: originalURL, to: backupURL)
+                backups.append(ReplacementBackup(originalURL: originalURL, backupURL: backupURL))
+            }
+
+            for plan in installationPlans {
+                try fileManager.moveItem(at: plan.stagedURL, to: plan.destinationURL)
+                installedDestinations.append(plan.destinationURL)
+            }
+        } catch {
+            for destinationURL in installedDestinations.reversed()
+                where fileManager.fileExists(atPath: destinationURL.path) {
+                try? fileManager.removeItem(at: destinationURL)
+            }
+            restore(backups: backups, fileManager: fileManager)
+            throw error
+        }
+
+        let installedMods = installationPlans.map { plan in
+            InstalledMod(
+                manifest: plan.package.manifest,
+                sourceURL: plan.package.folderURL,
+                destinationURL: plan.destinationURL
             )
         }
 
@@ -404,12 +449,54 @@ public enum ModInstaller {
             withIntermediateDirectories: true
         )
 
-        if destinationExisted {
-            try fileManager.removeItem(at: destinationURL)
+        let transactionID = UUID().uuidString
+        let stagedURL = destinationURL.deletingLastPathComponent()
+            .appendingPathComponent(".\(destinationURL.lastPathComponent).staged-\(transactionID)")
+        let backupURL = destinationURL.deletingLastPathComponent()
+            .appendingPathComponent(".\(destinationURL.lastPathComponent).backup-\(transactionID)")
+
+        try fileManager.copyItem(at: sourceURL, to: stagedURL)
+        do {
+            if destinationExisted {
+                try fileManager.moveItem(at: destinationURL, to: backupURL)
+            }
+            try fileManager.moveItem(at: stagedURL, to: destinationURL)
+            if destinationExisted {
+                try fileManager.removeItem(at: backupURL)
+            }
+        } catch {
+            try? fileManager.removeItem(at: stagedURL)
+            if destinationExisted,
+               fileManager.fileExists(atPath: backupURL.path),
+               !fileManager.fileExists(atPath: destinationURL.path) {
+                try? fileManager.moveItem(at: backupURL, to: destinationURL)
+            }
+            throw error
         }
 
-        try fileManager.copyItem(at: sourceURL, to: destinationURL)
         return destinationExisted ? .overwritten : .created
+    }
+
+    private static func topLevelReplacementFolders(from mods: [ModItem]) -> [URL] {
+        let folders = Array(Set(mods.map { $0.folderURL.standardizedFileURL }))
+        return folders
+            .filter { folderURL in
+                !folders.contains { candidateURL in
+                    candidateURL != folderURL && folderURL.isContained(in: candidateURL)
+                }
+            }
+            .sorted { lhs, rhs in
+                lhs.path.localizedStandardCompare(rhs.path) == .orderedAscending
+            }
+    }
+
+    private static func restore(backups: [ReplacementBackup], fileManager: FileManager) {
+        for backup in backups.reversed() where fileManager.fileExists(atPath: backup.backupURL.path) {
+            if fileManager.fileExists(atPath: backup.originalURL.path) {
+                try? fileManager.removeItem(at: backup.originalURL)
+            }
+            try? fileManager.moveItem(at: backup.backupURL, to: backup.originalURL)
+        }
     }
 
     private static func uniqueDestinationURL(
@@ -480,6 +567,17 @@ public enum ModInstaller {
 private struct InstallablePackage: Equatable {
     let manifest: ModManifest
     let folderURL: URL
+}
+
+private struct InstallationPlan {
+    let package: InstallablePackage
+    let stagedURL: URL
+    let destinationURL: URL
+}
+
+private struct ReplacementBackup {
+    let originalURL: URL
+    let backupURL: URL
 }
 
 private struct TranslationDestinationResolver {

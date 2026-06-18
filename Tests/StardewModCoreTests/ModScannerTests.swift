@@ -223,7 +223,7 @@ func modStateControllerDoesNotEnableWholeDisabledParentFolder() throws {
 }
 
 @Test
-func installReplacesExistingModByDeletingOldFolderFirst() throws {
+func installReplacesExistingModTransactionally() throws {
     let fileManager = FileManager.default
     let tempRoot = fileManager.temporaryDirectory
         .appendingPathComponent(UUID().uuidString, isDirectory: true)
@@ -264,6 +264,46 @@ func installReplacesExistingModByDeletingOldFolderFirst() throws {
     #expect(!fileManager.fileExists(atPath: oldModFolder.appendingPathComponent("obsolete.txt").path))
     #expect(scanResult.mods.count == 1)
     #expect(scanResult.mods.first?.manifest.version == "2.0.0")
+    #expect(
+        try fileManager.contentsOfDirectory(atPath: modsRoot.path)
+            .allSatisfy { !$0.hasPrefix(".stardew-mod-manager-transaction-") }
+    )
+}
+
+@Test
+func installKeepsExistingModWhenIncomingPackageCannotBeStaged() throws {
+    let fileManager = FileManager.default
+    let tempRoot = fileManager.temporaryDirectory
+        .appendingPathComponent(UUID().uuidString, isDirectory: true)
+    let modsRoot = tempRoot.appendingPathComponent("Mods", isDirectory: true)
+    let packageRoot = tempRoot.appendingPathComponent("Package", isDirectory: true)
+    let oldModFolder = modsRoot.appendingPathComponent("ExampleMod", isDirectory: true)
+    let incomingModFolder = packageRoot.appendingPathComponent("ExampleMod", isDirectory: true)
+    let unreadableFile = incomingModFolder.appendingPathComponent("unreadable.bin")
+    defer {
+        try? fileManager.setAttributes([.posixPermissions: 0o644], ofItemAtPath: unreadableFile.path)
+        try? fileManager.removeItem(at: tempRoot)
+    }
+
+    try fileManager.createDirectory(at: oldModFolder, withIntermediateDirectories: true)
+    try fileManager.createDirectory(at: incomingModFolder, withIntermediateDirectories: true)
+    try writeManifest(name: "Example Mod", version: "1.0.0", uniqueID: "Example.Mod", to: oldModFolder)
+    try "old data".write(
+        to: oldModFolder.appendingPathComponent("keep.txt"),
+        atomically: true,
+        encoding: .utf8
+    )
+    try writeManifest(name: "Example Mod", version: "2.0.0", uniqueID: "Example.Mod", to: incomingModFolder)
+    try Data([0x01]).write(to: unreadableFile)
+    try fileManager.setAttributes([.posixPermissions: 0o000], ofItemAtPath: unreadableFile.path)
+
+    #expect(throws: (any Error).self) {
+        _ = try ModInstaller.install(sourceURL: packageRoot, into: modsRoot)
+    }
+
+    let scanResult = ModScanner.scan(rootURL: modsRoot)
+    #expect(scanResult.mods.first?.manifest.version == "1.0.0")
+    #expect(fileManager.fileExists(atPath: oldModFolder.appendingPathComponent("keep.txt").path))
 }
 
 @Test

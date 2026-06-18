@@ -292,6 +292,51 @@ struct AppStrings: Sendable {
         }
     }
 
+    var modLibrary: String {
+        switch language {
+        case .simplifiedChinese:
+            "模组资料库"
+        case .english:
+            "Mod Library"
+        }
+    }
+
+    var moreActions: String {
+        switch language {
+        case .simplifiedChinese:
+            "更多操作"
+        case .english:
+            "More Actions"
+        }
+    }
+
+    var showConsole: String {
+        switch language {
+        case .simplifiedChinese:
+            "展开游戏终端"
+        case .english:
+            "Show Game Console"
+        }
+    }
+
+    var hideConsole: String {
+        switch language {
+        case .simplifiedChinese:
+            "收起游戏终端"
+        case .english:
+            "Hide Game Console"
+        }
+    }
+
+    var modInformation: String {
+        switch language {
+        case .simplifiedChinese:
+            "模组信息"
+        case .english:
+            "Mod Information"
+        }
+    }
+
     var enabledToggle: String {
         switch language {
         case .simplifiedChinese:
@@ -611,6 +656,15 @@ struct AppStrings: Sendable {
             "禁用"
         case (.disabled, .english):
             "Disabled"
+        }
+    }
+
+    func modCount(_ count: Int) -> String {
+        switch language {
+        case .simplifiedChinese:
+            "共 \(count) 个模组"
+        case .english:
+            count == 1 ? "1 mod" : "\(count) mods"
         }
     }
 

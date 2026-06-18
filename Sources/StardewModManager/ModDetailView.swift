@@ -15,7 +15,7 @@ struct ModDetailView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 22) {
+            VStack(alignment: .leading, spacing: 16) {
                 titleBlock
                 issueBlock
                 updateStatusBlock
@@ -24,78 +24,85 @@ struct ModDetailView: View {
                 updateKeySection
                 descriptionSection
             }
-            .padding(28)
-            .frame(maxWidth: 920, alignment: .leading)
+            .padding(24)
+            .frame(maxWidth: 980, alignment: .leading)
+            .frame(maxWidth: .infinity, alignment: .center)
         }
         .background(Color(nsColor: .windowBackgroundColor))
     }
 
     private var titleBlock: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .top, spacing: 12) {
-                Image(systemName: mod.manifest.kind == .codeMod ? "shippingbox" : "paintpalette")
-                    .font(.system(size: 30))
-                    .foregroundStyle(mod.manifest.kind == .codeMod ? .blue : .pink)
-                    .frame(width: 40)
+        SurfaceCard {
+            VStack(alignment: .leading, spacing: 14) {
+                HStack(alignment: .top, spacing: 14) {
+                    Image(systemName: mod.manifest.kind == .codeMod ? "shippingbox.fill" : "paintpalette.fill")
+                        .font(.system(size: 28))
+                        .foregroundStyle(mod.manifest.kind == .codeMod ? .blue : .pink)
+                        .frame(width: 52, height: 52)
+                        .background(
+                            (mod.manifest.kind == .codeMod ? Color.blue : Color.pink).opacity(0.12),
+                            in: RoundedRectangle(cornerRadius: 12)
+                        )
 
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(mod.manifest.name)
-                        .font(.largeTitle.weight(.semibold))
-                        .textSelection(.enabled)
+                    VStack(alignment: .leading, spacing: 7) {
+                        Text(mod.manifest.name)
+                            .font(.title.weight(.semibold))
+                            .textSelection(.enabled)
 
-                    HStack(spacing: 8) {
-                        StatusBadge(status: mod.status)
-                        UpdateStatusBadge(status: updateStatus)
-                        Text(mod.manifest.version)
-                            .font(.callout.weight(.medium))
-                        Text(strings.authorName(mod.manifest.author))
-                            .font(.callout)
-                            .foregroundStyle(.secondary)
+                        HStack(spacing: 8) {
+                            StatusBadge(status: mod.status)
+                            UpdateStatusBadge(status: updateStatus)
+                            Text(mod.manifest.version)
+                                .font(.callout.weight(.medium))
+                            Text(strings.authorName(mod.manifest.author))
+                                .font(.callout)
+                                .foregroundStyle(.secondary)
+                        }
                     }
+
+                    Spacer(minLength: 16)
+
+                    Toggle(
+                        strings.enabledToggle,
+                        isOn: Binding(
+                            get: { !mod.isDisabled },
+                            set: { isEnabled in
+                                onSetEnabled(isEnabled)
+                            }
+                        )
+                    )
+                    .toggleStyle(.switch)
+                    .controlSize(.regular)
+                    .disabled(isChangingState)
+                    .help(mod.isDisabled ? strings.enableThisModHelp : strings.disableThisModHelp)
                 }
 
-                Spacer(minLength: 16)
-
-                Toggle(
-                    strings.enabledToggle,
-                    isOn: Binding(
-                        get: { !mod.isDisabled },
-                        set: { isEnabled in
-                            onSetEnabled(isEnabled)
-                        }
-                    )
-                )
-                .toggleStyle(.switch)
-                .controlSize(.regular)
-                .disabled(isChangingState)
-                .help(mod.isDisabled ? strings.enableThisModHelp : strings.disableThisModHelp)
+                Label(mod.relativePath, systemImage: "folder")
+                    .font(.footnote.monospaced())
+                    .foregroundStyle(.secondary)
+                    .textSelection(.enabled)
             }
-
-            Text(mod.relativePath)
-                .font(.footnote.monospaced())
-                .foregroundStyle(.secondary)
-                .textSelection(.enabled)
         }
     }
 
     @ViewBuilder
     private var issueBlock: some View {
         if mod.hasIssues || mod.isDisabled {
-            VStack(alignment: .leading, spacing: 10) {
-                if mod.isDisabled {
-                    IssueLine(icon: "pause.circle", tint: .secondary, text: strings.modDisabledIssue)
-                }
+            SurfaceCard {
+                VStack(alignment: .leading, spacing: 10) {
+                    if mod.isDisabled {
+                        IssueLine(icon: "pause.circle", tint: .secondary, text: strings.modDisabledIssue)
+                    }
 
-                if mod.isDuplicateUniqueID {
-                    IssueLine(icon: "doc.on.doc", tint: .orange, text: strings.duplicateUniqueIDIssue)
-                }
+                    if mod.isDuplicateUniqueID {
+                        IssueLine(icon: "doc.on.doc", tint: .orange, text: strings.duplicateUniqueIDIssue)
+                    }
 
-                ForEach(mod.missingRequiredDependencies, id: \.self) { uniqueID in
-                    IssueLine(icon: "exclamationmark.triangle", tint: .orange, text: strings.missingRequiredDependency(uniqueID))
+                    ForEach(mod.missingRequiredDependencies, id: \.self) { uniqueID in
+                        IssueLine(icon: "exclamationmark.triangle", tint: .orange, text: strings.missingRequiredDependency(uniqueID))
+                    }
                 }
             }
-            .padding(14)
-            .background(.quaternary, in: RoundedRectangle(cornerRadius: 8))
         }
     }
 
@@ -103,61 +110,65 @@ struct ModDetailView: View {
     private var updateStatusBlock: some View {
         switch updateStatus {
         case .checking:
-            HStack(spacing: 8) {
-                ProgressView()
-                    .controlSize(.small)
-                Text(strings.checkingUpdates)
-                    .foregroundStyle(.secondary)
+            SurfaceCard {
+                HStack(spacing: 8) {
+                    ProgressView()
+                        .controlSize(.small)
+                    Text(strings.checkingUpdates)
+                        .foregroundStyle(.secondary)
+                }
             }
         case .updateAvailable(let version, let url):
-            VStack(alignment: .leading, spacing: 10) {
-                IssueLine(
-                    icon: "arrow.down.circle",
-                    tint: .blue,
-                    text: strings.foundNewVersion(version: version, currentVersion: mod.manifest.version)
-                )
+            SurfaceCard {
+                VStack(alignment: .leading, spacing: 10) {
+                    IssueLine(
+                        icon: "arrow.down.circle",
+                        tint: .blue,
+                        text: strings.foundNewVersion(version: version, currentVersion: mod.manifest.version)
+                    )
 
-                if let url {
-                    Link(destination: url) {
-                        Label(strings.openDownloadPage, systemImage: "safari")
+                    if let url {
+                        Link(destination: url) {
+                            Label(strings.openDownloadPage, systemImage: "safari")
+                        }
                     }
                 }
             }
-            .padding(14)
-            .background(.blue.opacity(0.10), in: RoundedRectangle(cornerRadius: 8))
         case .failed(let message):
-            IssueLine(icon: "exclamationmark.triangle", tint: .secondary, text: strings.updateCheckFailed(message))
-                .padding(14)
-                .background(.quaternary, in: RoundedRectangle(cornerRadius: 8))
+            SurfaceCard {
+                IssueLine(icon: "exclamationmark.triangle", tint: .secondary, text: strings.updateCheckFailed(message))
+            }
         case .notChecked, .current:
             EmptyView()
         }
     }
 
     private var metadataGrid: some View {
-        Grid(alignment: .leading, horizontalSpacing: 18, verticalSpacing: 12) {
-            MetadataRow(label: "UniqueID", value: mod.manifest.uniqueID)
-            MetadataRow(label: strings.metadataType, value: strings.modKindLabel(mod.manifest.kind))
-            MetadataRow(label: strings.metadataCategory, value: strings.categoryName(mod.category))
-            MetadataRow(label: strings.metadataPath, value: mod.folderURL.path)
+        DetailSection(title: strings.modInformation) {
+            Grid(alignment: .leading, horizontalSpacing: 18, verticalSpacing: 12) {
+                MetadataRow(label: "UniqueID", value: mod.manifest.uniqueID)
+                MetadataRow(label: strings.metadataType, value: strings.modKindLabel(mod.manifest.kind))
+                MetadataRow(label: strings.metadataCategory, value: strings.categoryName(mod.category))
+                MetadataRow(label: strings.metadataPath, value: mod.folderURL.path)
 
-            if let entryDll = mod.manifest.entryDll {
-                MetadataRow(label: "EntryDll", value: entryDll)
-            }
+                if let entryDll = mod.manifest.entryDll {
+                    MetadataRow(label: "EntryDll", value: entryDll)
+                }
 
-            if let contentPackFor = mod.manifest.contentPackFor {
-                MetadataRow(label: strings.metadataContentPackTarget, value: contentPackFor.uniqueID)
-            }
+                if let contentPackFor = mod.manifest.contentPackFor {
+                    MetadataRow(label: strings.metadataContentPackTarget, value: contentPackFor.uniqueID)
+                }
 
-            if let minimumApiVersion = mod.manifest.minimumApiVersion {
-                MetadataRow(label: "SMAPI", value: minimumApiVersion)
-            }
+                if let minimumApiVersion = mod.manifest.minimumApiVersion {
+                    MetadataRow(label: "SMAPI", value: minimumApiVersion)
+                }
 
-            if let minimumGameVersion = mod.manifest.minimumGameVersion {
-                MetadataRow(label: strings.metadataGameVersion, value: minimumGameVersion)
+                if let minimumGameVersion = mod.manifest.minimumGameVersion {
+                    MetadataRow(label: strings.metadataGameVersion, value: minimumGameVersion)
+                }
             }
+            .font(.body)
         }
-        .font(.body)
     }
 
     @ViewBuilder
@@ -281,10 +292,13 @@ private struct DetailSection<Content: View>: View {
     @ViewBuilder let content: Content
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(title)
-                .font(.headline)
-            content
+        SurfaceCard {
+            VStack(alignment: .leading, spacing: 12) {
+                Text(title)
+                    .font(.headline)
+                Divider()
+                content
+            }
         }
     }
 }
