@@ -409,15 +409,6 @@ struct AppStrings: Sendable {
         }
     }
 
-    var metadataCategory: String {
-        switch language {
-        case .simplifiedChinese:
-            "分类"
-        case .english:
-            "Category"
-        }
-    }
-
     var metadataPath: String {
         switch language {
         case .simplifiedChinese:
@@ -717,21 +708,6 @@ struct AppStrings: Sendable {
             return "未知作者"
         case .english:
             return "Unknown Author"
-        }
-    }
-
-    func categoryName(_ category: String) -> String {
-        switch (category, language) {
-        case ("未分类", .simplifiedChinese):
-            "未分类"
-        case ("未分类", .english):
-            "Uncategorized"
-        case ("读取 Nexus 分类中", .simplifiedChinese):
-            "读取 Nexus 分类中"
-        case ("读取 Nexus 分类中", .english):
-            "Loading Nexus Category"
-        default:
-            category
         }
     }
 

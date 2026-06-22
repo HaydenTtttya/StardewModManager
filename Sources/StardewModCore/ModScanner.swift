@@ -17,7 +17,6 @@ public struct ModItem: Identifiable, Equatable, Sendable {
     public let manifest: ModManifest
     public let folderURL: URL
     public let relativePath: String
-    public let category: String
     public let isDisabled: Bool
     public let missingRequiredDependencies: [String]
     public let missingOptionalDependencies: [String]
@@ -27,7 +26,6 @@ public struct ModItem: Identifiable, Equatable, Sendable {
         manifest: ModManifest,
         folderURL: URL,
         relativePath: String,
-        category: String,
         isDisabled: Bool,
         missingRequiredDependencies: [String] = [],
         missingOptionalDependencies: [String] = [],
@@ -37,7 +35,6 @@ public struct ModItem: Identifiable, Equatable, Sendable {
         self.manifest = manifest
         self.folderURL = folderURL
         self.relativePath = relativePath
-        self.category = category
         self.isDisabled = isDisabled
         self.missingRequiredDependencies = missingRequiredDependencies
         self.missingOptionalDependencies = missingOptionalDependencies
@@ -126,7 +123,6 @@ public enum ModScanner {
                         manifest: manifest,
                         folderURL: folderURL,
                         relativePath: relativePath,
-                        category: categoryName(for: manifest),
                         isDisabled: containsDisabledPathComponent(relativePath)
                     )
                 )
@@ -166,7 +162,6 @@ public enum ModScanner {
                 manifest: mod.manifest,
                 folderURL: mod.folderURL,
                 relativePath: mod.relativePath,
-                category: mod.category,
                 isDisabled: mod.isDisabled,
                 missingRequiredDependencies: missingRequired,
                 missingOptionalDependencies: missingOptional,
@@ -180,10 +175,6 @@ public enum ModScanner {
         let folderComponents = folderURL.pathComponents
         let suffix = folderComponents.dropFirst(rootComponents.count)
         return suffix.joined(separator: "/")
-    }
-
-    private static func categoryName(for manifest: ModManifest) -> String {
-        manifest.nexusModID == nil ? "未分类" : "读取 Nexus 分类中"
     }
 
     private static func containsDisabledPathComponent(_ relativePath: String) -> Bool {

@@ -21,10 +21,6 @@ public struct ModManifest: Decodable, Equatable, Sendable {
         contentPackFor == nil ? .codeMod : .contentPack
     }
 
-    public var nexusModID: Int? {
-        updateKeys?.compactMap(Self.nexusModID(from:)).first
-    }
-
     public init(
         name: String,
         author: String?,
@@ -86,19 +82,6 @@ public struct ModManifest: Decodable, Equatable, Sendable {
         )
     }
 
-    private static func nexusModID(from updateKey: String) -> Int? {
-        guard updateKey.localizedCaseInsensitiveContains("Nexus:") else {
-            return nil
-        }
-
-        let parts = updateKey.split(separator: ":", maxSplits: 1)
-        guard parts.count == 2 else {
-            return nil
-        }
-
-        let digits = parts[1].prefix { $0.isNumber }
-        return Int(digits)
-    }
 }
 
 public struct ContentPackFor: Decodable, Equatable, Sendable {

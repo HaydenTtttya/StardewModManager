@@ -148,7 +148,6 @@ struct ModDetailView: View {
             Grid(alignment: .leading, horizontalSpacing: 18, verticalSpacing: 12) {
                 MetadataRow(label: "UniqueID", value: mod.manifest.uniqueID)
                 MetadataRow(label: strings.metadataType, value: strings.modKindLabel(mod.manifest.kind))
-                MetadataRow(label: strings.metadataCategory, value: strings.categoryName(mod.category))
                 MetadataRow(label: strings.metadataPath, value: mod.folderURL.path)
 
                 if let entryDll = mod.manifest.entryDll {

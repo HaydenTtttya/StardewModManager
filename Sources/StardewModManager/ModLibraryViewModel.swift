@@ -36,11 +36,9 @@ final class ModLibraryViewModel: ObservableObject {
     @Published private(set) var updateStatuses: [ModItem.ID: ModUpdateStatus] = [:]
     @Published var installNotice: InstallationNotice?
 
-    private let nexusCategoryResolver = NexusCategoryResolver()
     private let modUpdateChecker = ModUpdateChecker()
     private let folderStore: ModsFolderStore
     private let gameProcessController: GameProcessController
-    private var categoryLookupTask: Task<Void, Never>?
     private var updateLookupTask: Task<Void, Never>?
     private var gameConsoleLanguage: AppLanguage = .simplifiedChinese
 
@@ -98,7 +96,6 @@ final class ModLibraryViewModel: ObservableObject {
     }
 
     func refresh() {
-        categoryLookupTask?.cancel()
         updateLookupTask?.cancel()
         isScanning = true
         let result = ModScanner.scan(rootURL: rootURL)
@@ -110,7 +107,6 @@ final class ModLibraryViewModel: ObservableObject {
         }
 
         isScanning = false
-        resolveNexusCategories(for: result.mods)
         checkForModUpdates(for: result.mods)
         ensureSelectedModMatchesCurrentFilter()
     }
@@ -407,30 +403,6 @@ final class ModLibraryViewModel: ObservableObject {
         "'" + path.replacingOccurrences(of: "'", with: "'\\''") + "'"
     }
 
-    private func resolveNexusCategories(for scannedMods: [ModItem]) {
-        let nexusModIDs = Set(scannedMods.compactMap(\.manifest.nexusModID))
-        guard !nexusModIDs.isEmpty else {
-            return
-        }
-
-        categoryLookupTask = Task { [nexusCategoryResolver] in
-            let resolvedCategories = await nexusCategoryResolver.categories(for: nexusModIDs)
-            guard !Task.isCancelled else {
-                return
-            }
-
-            await MainActor.run {
-                mods = mods.map { mod in
-                    guard let nexusModID = mod.manifest.nexusModID else {
-                        return mod
-                    }
-
-                    return mod.replacingCategory(resolvedCategories[nexusModID] ?? "未分类")
-                }
-            }
-        }
-    }
-
     private func matchesSelectedFilter(_ mod: ModItem) -> Bool {
         switch selectedFilter {
         case .all:
@@ -491,21 +463,6 @@ struct InstallationNotice: Identifiable {
     let id = UUID()
     let title: String
     let message: String
-}
-
-private extension ModItem {
-    func replacingCategory(_ category: String) -> ModItem {
-        ModItem(
-            manifest: manifest,
-            folderURL: folderURL,
-            relativePath: relativePath,
-            category: category,
-            isDisabled: isDisabled,
-            missingRequiredDependencies: missingRequiredDependencies,
-            missingOptionalDependencies: missingOptionalDependencies,
-            isDuplicateUniqueID: isDuplicateUniqueID
-        )
-    }
 }
 
 enum DefaultModsLocator {

@@ -22,7 +22,6 @@ func decodesSMAPIManifestKeys() throws {
     #expect(manifest.uniqueID == "Pathoschild.ContentPatcher")
     #expect(manifest.kind == .codeMod)
     #expect(manifest.updateKeys == ["Nexus:1915"])
-    #expect(manifest.nexusModID == 1915)
 }
 
 @Test
@@ -52,38 +51,6 @@ func decodesManifestWithJSONCCommentsAndUniqueIdAlias() throws {
 
     #expect(manifest.uniqueID == "SMAPI.ConsoleCommands")
     #expect(manifest.dependencies?.first?.uniqueID == "Example.Optional")
-}
-
-@Test
-func scanUsesNexusPlaceholderInsteadOfFolderCategory() throws {
-    let root = FileManager.default.temporaryDirectory
-        .appendingPathComponent(UUID().uuidString, isDirectory: true)
-    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
-    defer { try? FileManager.default.removeItem(at: root) }
-
-    let modFolder = root
-        .appendingPathComponent("My Local Folder", isDirectory: true)
-        .appendingPathComponent("ExampleMod", isDirectory: true)
-    try FileManager.default.createDirectory(at: modFolder, withIntermediateDirectories: true)
-
-    let manifest = """
-    {
-      "Name": "Example Mod",
-      "Author": "Example",
-      "Version": "1.0.0",
-      "UniqueID": "Example.Mod",
-      "UpdateKeys": ["Nexus:1234"]
-    }
-    """
-    try manifest.write(
-        to: modFolder.appendingPathComponent("manifest.json"),
-        atomically: true,
-        encoding: .utf8
-    )
-
-    let result = ModScanner.scan(rootURL: root)
-
-    #expect(result.mods.first?.category == "读取 Nexus 分类中")
 }
 
 @Test
