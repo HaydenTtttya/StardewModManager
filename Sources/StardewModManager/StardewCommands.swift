@@ -51,12 +51,8 @@ struct StardewCommands: Commands {
 
             Divider()
 
-            Button(library.isGameRunning ? strings.stopProcess : strings.startGame) {
-                if library.isGameRunning {
-                    library.stopGame(language: settings.language)
-                } else {
-                    library.launchGame(language: settings.language)
-                }
+            Button(strings.startGame) {
+                library.launchGame(language: settings.language)
             }
             .keyboardShortcut(.return, modifiers: .command)
         }

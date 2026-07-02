@@ -53,20 +53,12 @@ private struct GameLaunchToolbarButton: View {
 
     private var button: some View {
         Button {
-            if library.isGameRunning {
-                library.stopGame(language: settings.language)
-            } else {
-                library.launchGame(language: settings.language)
-            }
+            library.launchGame(language: settings.language)
         } label: {
-            if library.isGameRunning {
-                Label(strings.stopProcess, systemImage: "stop.fill")
-            } else {
-                Label(strings.startGame, systemImage: "play.fill")
-            }
+            Label(strings.startGame, systemImage: "play.fill")
         }
         .disabled(library.isInstalling)
-        .help(library.isGameRunning ? strings.stopGameHelp : strings.startGameHelp)
+        .help(strings.startGameHelp)
     }
 }
 

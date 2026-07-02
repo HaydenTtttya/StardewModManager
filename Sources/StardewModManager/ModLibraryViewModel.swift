@@ -30,25 +30,22 @@ final class ModLibraryViewModel: ObservableObject {
     @Published private(set) var isScanning = false
     @Published private(set) var isInstalling = false
     @Published private(set) var isChangingModState = false
-    @Published private(set) var isGameRunning = false
     @Published private(set) var isCheckingUpdates = false
-    @Published private(set) var gameConsoleText = ""
     @Published private(set) var updateStatuses: [ModItem.ID: ModUpdateStatus] = [:]
     @Published var installNotice: InstallationNotice?
 
     private let modUpdateChecker = ModUpdateChecker()
     private let folderStore: ModsFolderStore
-    private let gameProcessController: GameProcessController
+    private let terminalGameLauncher: TerminalGameLauncher
     private var updateLookupTask: Task<Void, Never>?
-    private var gameConsoleLanguage: AppLanguage = .simplifiedChinese
 
     init(
         rootURL: URL? = nil,
         folderStore: ModsFolderStore = ModsFolderStore(),
-        gameProcessController: GameProcessController = GameProcessController()
+        terminalGameLauncher: TerminalGameLauncher = TerminalGameLauncher()
     ) {
         self.folderStore = folderStore
-        self.gameProcessController = gameProcessController
+        self.terminalGameLauncher = terminalGameLauncher
         self.rootURL = rootURL ?? folderStore.load() ?? DefaultModsLocator.bestGuess()
         refresh()
     }
@@ -310,11 +307,9 @@ final class ModLibraryViewModel: ObservableObject {
 
     func launchGame(language: AppLanguage) {
         let strings = AppStrings(language: language)
-        gameConsoleLanguage = language
         let executableURL = smapiExecutableURL
         guard FileManager.default.fileExists(atPath: executableURL.path) else {
             let message = strings.smapiNotFound(executableURL.path)
-            appendGameConsoleLine(strings.launchFailed(message))
             installNotice = InstallationNotice(
                 title: strings.launchFailedTitle,
                 message: message
@@ -323,84 +318,18 @@ final class ModLibraryViewModel: ObservableObject {
         }
 
         do {
-            isGameRunning = true
-            resetGameConsole(for: executableURL)
-            try gameProcessController.launch(
-                executableURL: executableURL,
-                onOutput: { [weak self] text in
-                    self?.appendGameConsole(text)
-                },
-                onTermination: { [weak self] status in
-                    self?.finishGameProcess(status: status)
-                }
-            )
+            try terminalGameLauncher.launch(executableURL: executableURL)
 
             installNotice = InstallationNotice(
                 title: strings.launchingGameTitle,
                 message: strings.launchedGame(executableURL.path)
             )
         } catch {
-            appendGameConsoleLine(strings.launchFailed(strings.errorDescription(error)))
             installNotice = InstallationNotice(
                 title: strings.launchFailedTitle,
                 message: strings.errorDescription(error)
             )
-            finishGameProcess(status: nil)
         }
-    }
-
-    func stopGame(language: AppLanguage) {
-        let strings = AppStrings(language: language)
-        gameConsoleLanguage = language
-        guard gameProcessController.isRunning else {
-            appendGameConsoleLine(strings.noRunningGameProcess)
-            isGameRunning = false
-            return
-        }
-
-        if let processIdentifier = gameProcessController.processIdentifier {
-            appendGameConsoleLine("\n\(strings.stoppingProcess(processIdentifier))")
-        }
-        gameProcessController.stop()
-    }
-
-    func clearGameConsole() {
-        gameConsoleText = ""
-    }
-
-    private func resetGameConsole(for executableURL: URL) {
-        let workingDirectory = executableURL.deletingLastPathComponent().path
-        gameConsoleText = """
-        $ cd \(shellQuoted(workingDirectory))
-        $ ./\(executableURL.lastPathComponent)
-
-        """
-    }
-
-    private func appendGameConsoleLine(_ line: String) {
-        appendGameConsole(line + "\n")
-    }
-
-    private func appendGameConsole(_ text: String) {
-        gameConsoleText += text
-
-        let maximumConsoleLength = 120_000
-        if gameConsoleText.count > maximumConsoleLength {
-            gameConsoleText = String(gameConsoleText.suffix(maximumConsoleLength))
-        }
-    }
-
-    private func finishGameProcess(status: Int32?) {
-        isGameRunning = false
-
-        if let status {
-            let strings = AppStrings(language: gameConsoleLanguage)
-            appendGameConsoleLine("\n\(strings.processExited(status: status))")
-        }
-    }
-
-    private func shellQuoted(_ path: String) -> String {
-        "'" + path.replacingOccurrences(of: "'", with: "'\\''") + "'"
     }
 
     private func matchesSelectedFilter(_ mod: ModItem) -> Bool {
