@@ -76,15 +76,6 @@ struct AppStrings: Sendable {
         }
     }
 
-    var stopProcess: String {
-        switch language {
-        case .simplifiedChinese:
-            "停止进程"
-        case .english:
-            "Stop Process"
-        }
-    }
-
     var startGame: String {
         switch language {
         case .simplifiedChinese:
@@ -97,18 +88,9 @@ struct AppStrings: Sendable {
     var startGameHelp: String {
         switch language {
         case .simplifiedChinese:
-            "通过 StardewModdingAPI 启动游戏"
+            "在 macOS 终端中通过 StardewModdingAPI 启动游戏"
         case .english:
-            "Launch the game through StardewModdingAPI"
-        }
-    }
-
-    var stopGameHelp: String {
-        switch language {
-        case .simplifiedChinese:
-            "停止当前 StardewModdingAPI 进程"
-        case .english:
-            "Stop the current StardewModdingAPI process"
+            "Launch the game through StardewModdingAPI in Terminal"
         }
     }
 
@@ -229,42 +211,6 @@ struct AppStrings: Sendable {
         }
     }
 
-    var gameConsole: String {
-        switch language {
-        case .simplifiedChinese:
-            "游戏终端"
-        case .english:
-            "Game Console"
-        }
-    }
-
-    var running: String {
-        switch language {
-        case .simplifiedChinese:
-            "运行中"
-        case .english:
-            "Running"
-        }
-    }
-
-    var clear: String {
-        switch language {
-        case .simplifiedChinese:
-            "清空"
-        case .english:
-            "Clear"
-        }
-    }
-
-    var gameConsolePlaceholder: String {
-        switch language {
-        case .simplifiedChinese:
-            "启动游戏后，SMAPI 的加载日志会显示在这里。"
-        case .english:
-            "After you start the game, SMAPI loading logs will appear here."
-        }
-    }
-
     var searchModsPrompt: String {
         switch language {
         case .simplifiedChinese:
@@ -307,24 +253,6 @@ struct AppStrings: Sendable {
             "更多操作"
         case .english:
             "More Actions"
-        }
-    }
-
-    var showConsole: String {
-        switch language {
-        case .simplifiedChinese:
-            "展开游戏终端"
-        case .english:
-            "Show Game Console"
-        }
-    }
-
-    var hideConsole: String {
-        switch language {
-        case .simplifiedChinese:
-            "收起游戏终端"
-        case .english:
-            "Hide Game Console"
         }
     }
 
@@ -610,18 +538,9 @@ struct AppStrings: Sendable {
     var launchingGameTitle: String {
         switch language {
         case .simplifiedChinese:
-            "正在启动游戏"
+            "正在打开终端"
         case .english:
-            "Starting Game"
-        }
-    }
-
-    var noRunningGameProcess: String {
-        switch language {
-        case .simplifiedChinese:
-            "没有正在运行的游戏进程。"
-        case .english:
-            "No game process is running."
+            "Opening Terminal"
         }
     }
 
@@ -814,39 +733,12 @@ struct AppStrings: Sendable {
         }
     }
 
-    func launchFailed(_ message: String) -> String {
-        switch language {
-        case .simplifiedChinese:
-            "启动失败：\(localizedKnownMessage(message))"
-        case .english:
-            "Launch failed: \(localizedKnownMessage(message))"
-        }
-    }
-
     func launchedGame(_ path: String) -> String {
         switch language {
         case .simplifiedChinese:
-            "已通过 StardewModdingAPI 启动：\(path)"
+            "已在 macOS 终端中通过 StardewModdingAPI 启动：\(path)"
         case .english:
-            "Started through StardewModdingAPI: \(path)"
-        }
-    }
-
-    func stoppingProcess(_ processIdentifier: Int32) -> String {
-        switch language {
-        case .simplifiedChinese:
-            "正在停止进程：\(processIdentifier)"
-        case .english:
-            "Stopping process: \(processIdentifier)"
-        }
-    }
-
-    func processExited(status: Int32) -> String {
-        switch language {
-        case .simplifiedChinese:
-            "进程已退出，退出码：\(status)"
-        case .english:
-            "Process exited with code \(status)"
+            "Started through StardewModdingAPI in Terminal: \(path)"
         }
     }
 
